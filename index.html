@@ -1423,7 +1423,7 @@
           <div class="brand-logo">⚡</div>
           <div>
             <div class="brand-name">FFCS-FAST</div>
-            <div class="brand-sub">VIT CHENNAI // TIMETABLE BUILDER</div>
+            <div class="brand-sub">VIT CHENNAI // TIMETABLE BUILDER // BUILT BY ANTIGRAVITY</div>
           </div>
         </div>
         <div class="header-right">
@@ -1718,33 +1718,33 @@
     ═══════════════════════════════════════════ */
       const THEORY_TIMES = [
         "8:00",
-        "8:55",
+        "8:50",
         "9:50",
-        "10:45",
+        "10:40",
         "11:40",
-        "12:35",
+        "12:30",
         "LUNCH",
         "14:00",
-        "14:55",
+        "14:50",
         "15:50",
-        "16:45",
+        "16:40",
         "17:40",
-        "18:35",
+        "18:30",
       ];
       const THEORY_TIMES_END = [
         "8:50",
-        "9:45",
+        "9:40",
         "10:40",
-        "11:35",
+        "11:30",
         "12:30",
-        "13:25",
+        "13:20",
         "LUNCH",
         "14:50",
-        "15:45",
+        "15:40",
         "16:40",
-        "17:35",
+        "17:30",
         "18:30",
-        "19:25",
+        "19:20",
       ];
       const LAB_TIMES = [
         "8:00",
@@ -2124,10 +2124,6 @@
         tBtn.classList.toggle("lab-on", false);
         lBtn.classList.toggle("lab-on", pane === "lab");
         lBtn.classList.toggle("theory-on", false);
-        selectedSlots = [];
-        document
-          .querySelectorAll(".slot-btn")
-          .forEach((b) => b.classList.remove("selected"));
         updateSelectedDisplay();
       }
 
@@ -2135,11 +2131,14 @@
        SLOT SELECTION
     ═══════════════════════════════════════════ */
       function selectSlot(btn, combo) {
-        document
-          .querySelectorAll(".slot-btn")
-          .forEach((b) => b.classList.remove("selected"));
-        btn.classList.add("selected");
-        selectedSlots = combo;
+        if (btn.classList.contains("selected")) {
+          btn.classList.remove("selected");
+          selectedSlots = selectedSlots.filter(s => !combo.includes(s));
+        } else {
+          btn.classList.add("selected");
+          selectedSlots = [...selectedSlots, ...combo];
+        }
+        selectedSlots = [...new Set(selectedSlots)];
         updateSelectedDisplay();
       }
 
@@ -2148,7 +2147,8 @@
         if (selectedSlots.length) {
           el.textContent = "> " + selectedSlots.join(" + ");
           el.classList.add("visible");
-          el.classList.toggle("lab-mode", currentPane === "lab");
+          const hasTheory = selectedSlots.some(s => !s.startsWith("L"));
+          el.classList.toggle("lab-mode", !hasTheory);
         } else {
           el.classList.remove("visible");
         }
@@ -2255,6 +2255,53 @@
         showToast("✓ Course removed", "ok");
       }
 
+      function editCourse(id) {
+        const c = courses.find((c) => c.id === id);
+        if (!c) return;
+
+        document.getElementById("inp-code").value = c.code;
+        document.getElementById("inp-name").value = c.name;
+        document.getElementById("inp-faculty").value = c.faculty;
+        document.getElementById("inp-room").value = c.room;
+        document.getElementById("inp-credits").value = c.credits || "";
+
+        const isLab = c.slots[0].startsWith("L");
+        const tBtn = document.getElementById("btn-theory-toggle");
+        const lBtn = document.getElementById("btn-lab-toggle");
+        
+        if (isLab) {
+            currentPane = "lab";
+            document.getElementById("pane-theory").classList.remove("active");
+            document.getElementById("pane-lab").classList.add("active");
+            tBtn.classList.remove("theory-on");
+            lBtn.classList.add("lab-on");
+        } else {
+            currentPane = "theory";
+            document.getElementById("pane-lab").classList.remove("active");
+            document.getElementById("pane-theory").classList.add("active");
+            lBtn.classList.remove("lab-on");
+            tBtn.classList.add("theory-on");
+        }
+
+        document.querySelectorAll(".slot-btn").forEach((b) => b.classList.remove("selected"));
+        selectedSlots = [...c.slots];
+        c.slots.forEach((s) => {
+          document.querySelectorAll(".slot-btn").forEach((btn) => {
+            if (btn.getAttribute("onclick") && btn.getAttribute("onclick").includes(`'${s}'`)) {
+              btn.classList.add("selected");
+            }
+          });
+        });
+        updateSelectedDisplay();
+
+        deleteCourse(id);
+        const addTab = Array.from(document.querySelectorAll(".nav-tab")).find(t => t.textContent.includes("Add Course"));
+        if (addTab) switchTab("add", addTab);
+        
+        document.getElementById("inp-code").focus();
+        showToast("✏ Edit mode: " + c.code, "ok");
+      }
+
       function clearForm() {
         [
           "inp-code",
@@ -2315,6 +2362,7 @@
       <span class="ci-slot">${esc(c.slots.join("+"))}</span>
       <span class="ci-name">${esc(c.name || "—")}</span>
       ${c.credits ? `<span class="ci-credits">${c.credits} cr</span>` : ""}
+      <button class="ci-edit" onclick="editCourse(${c.id})" aria-label="Edit" style="background:none;border:none;color:var(--cyan);cursor:pointer;padding:0 4px;margin-left:auto;">✏</button>
       <button class="ci-del" onclick="deleteCourse(${c.id})" aria-label="Remove">×</button>
     </div>`;
         });
@@ -2386,7 +2434,10 @@
           // Theory row
           html += `<tr><td class="td-day" rowspan="2">${day}</td><td class="td-theory-label">Theory</td>`;
           tBlocks.forEach((block, raw) => {
-            if (block === "LUNCH") return;
+            if (block === "LUNCH") {
+              html += `<td class="sc" style="background:transparent;border:none;"></td>`;
+              return;
+            }
             if (block === "-") {
               html += `<td class="sc sc-dash"><span class="sc-block" style="color:#2a2a3d">—</span></td>`;
               return;
@@ -2413,7 +2464,10 @@
           // Lab row
           html += `<tr><td class="td-lab-label">Lab</td>`;
           lBlocks.forEach((block, raw) => {
-            if (block === "LUNCH") return;
+            if (block === "LUNCH") {
+              html += `<td class="sc" style="background:transparent;border:none;"></td>`;
+              return;
+            }
             const course = getCourseForBlock(block);
             const dupConf = isSlotDuplicate(block);
             const timeOver = overlaps.has(day + ":" + raw);
